@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Name Extractor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for better aesthetics in dark mode */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex items-center justify-center p-4 font-sans">
+
+    <main class="w-full max-w-3xl bg-gray-800 rounded-xl shadow-2xl p-6 md:p-8 flex flex-col gap-6">
+        
+        <header class="text-center">
+            <h1 class="text-2xl md:text-3xl font-bold text-blue-400 mb-2">Bot Command Generator</h1>
+            <p class="text-gray-400 text-sm">Automatically cleans messy trading lists and formats them into your bot command.</p>
+        </header>
+
+        <section class="flex flex-col gap-2">
+            <label for="inputText" class="text-sm font-semibold text-gray-300">Unorganized List</label>
+            <textarea id="inputText" 
+                class="w-full h-40 bg-gray-950 border border-gray-700 rounded-lg p-4 text-gray-200 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-y transition-all"
+                placeholder="Paste your unorganized list here... (e.g., LF miku nakano | 120k, aura bella - 70k, yugi muto > 60k)"></textarea>
+        </section>
+
+        <div class="flex justify-center">
+            <button onclick="formatText()" 
+                class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-lg shadow-lg hover:shadow-blue-500/20 transition-all duration-200 active:scale-95">
+                Generate Command
+            </button>
+        </div>
+
+        <section class="flex flex-col gap-2">
+            <label for="outputText" class="text-sm font-semibold text-gray-300">Generated Command</label>
+            <textarea id="outputText" 
+                readonly
+                class="w-full h-32 bg-gray-900 border border-gray-700 rounded-lg p-4 text-green-400 font-mono text-sm focus:outline-none resize-y"
+                placeholder="Your formatted command will appear here..."></textarea>
+        </section>
+
+        <div class="flex justify-center mt-2">
+            <button id="copyBtn" onclick="copyText()" 
+                class="bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-6 rounded-lg shadow transition-all duration-200 hidden">
+                Copy to Clipboard
+            </button>
+        </div>
+
+    </main>
+
+    <script>
+        function formatText() {
+            // 1. Get the input value
+            let input = document.getElementById('inputText').value;
+
+            // 2. Remove end-of-message notes BEFORE splitting (so we don't accidentally split the note)
+            input = input.replace(/-\s*(dm|pm|ping|message|note)\b.*/gi, '');
+
+            // 3. Split the input by commas, newlines, vertical bars, dashes, slashes, or greater-than signs
+            const rawItems = input.split(/[|\,\-\n>\/]/);
+
+            // 4. Process each item in the array
+            const cleanedItems = rawItems.map(item => {
+                let cleaned = item;
+                
+                // a. Remove trading terms (LF, SR, UR, WTB, WTS, ea)
+                cleaned = cleaned.replace(/\b(LF|SR|UR|WTB|WTS|ea)\b/gi, '');
+                
+                // b. Remove complex prices and gambles (e.g., 75k, 1.1 mil, +100k, 5m)
+                cleaned = cleaned.replace(/[+-]?\s*\d+(\.\d+)?\s*(k|m|b|mil|mill|million|billion)\b/gi, '');
+                
+                // c. Remove card status codes (e.g., a4p6, a4, p6)
+                cleaned = cleaned.replace(/\b([ap]\d)+\b/gi, '');
+                
+                // d. Remove any leftover separator symbols
+                cleaned = cleaned.replace(/[|:\->+]/g, '');
+                
+                // e. Remove extra spaces and trim the ends
+                cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+
+                return cleaned;
+            });
+
+            // 5. Filter out empty strings that were left over after cleaning
+            const finalNames = cleanedItems.filter(name => name.length > 0);
+
+            // 6. Join remaining names and format final command
+            const outputElement = document.getElementById('outputText');
+            const copyBtn = document.getElementById('copyBtn');
+            
+            if (finalNames.length > 0) {
+                const joinedNames = finalNames.join(', ');
+                outputElement.value = `.inv -r ur -n ${joinedNames} -evo 1`;
+                
+                // Add a visual cue that it worked
+                outputElement.classList.add('bg-green-900/20');
+                setTimeout(() => outputElement.classList.remove('bg-green-900/20'), 300);
+                
+                // Show the copy button now that we have text
+                copyBtn.classList.remove('hidden');
+            } else {
+                outputElement.value = "No names found!";
+                copyBtn.classList.add('hidden');
+            }
+        }
+
+        function copyText() {
+            const outputElement = document.getElementById('outputText');
+            
+            // Select the text field
+            outputElement.select();
+            outputElement.setSelectionRange(0, 99999); // For mobile devices compatibility
+            
+            try {
+                // Copy text inside the text field
+                document.execCommand('copy');
+                
+                // Temporarily change button text and color to indicate success
+                const copyBtn = document.getElementById('copyBtn');
+                copyBtn.innerText = 'Copied!';
+                copyBtn.classList.add('bg-green-600', 'hover:bg-green-500');
+                copyBtn.classList.remove('bg-gray-700', 'hover:bg-gray-600');
+                
+                // Reset button after 2 seconds
+                setTimeout(() => {
+                    copyBtn.innerText = 'Copy to Clipboard';
+                    copyBtn.classList.remove('bg-green-600', 'hover:bg-green-500');
+                    copyBtn.classList.add('bg-gray-700', 'hover:bg-gray-600');
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy text', err);
+            }
+        }
+    </script>
+</body>
+</html>
